@@ -1,10 +1,12 @@
 // ============================================================
-//  CONFIGURACIÓN  ←  EDITA ESTOS 3 VALORES ANTES DE USAR
+//  CONFIGURACIÓN  ←  EDITA ESTOS VALORES ANTES DE USAR
 // ============================================================
 var CONFIG = {
-  KOBO_API_TOKEN:     '64cc018b88067397addd36b09288be8b6539cf39',   // Token de API de KoboToolbox
-  NOTIFICATION_EMAIL: 'adrian@creamosguatemala.org',                 // Correo que recibirá el resumen
-  KOBO_ASSET_UID:     'aJHSDMnJqjhZ6YPUsiyEze'                       // UID del formulario
+  KOBO_API_TOKEN:        '64cc018b88067397addd36b09288be8b6539cf39', // Token de API de KoboToolbox
+  NOTIFICATION_EMAIL:    'adrian@creamosguatemala.org',              // Correo que recibirá el resumen
+  KOBO_ASSET_UID:        'aJHSDMnJqjhZ6YPUsiyEze',                   // UID del formulario
+  BLOOMERANG_API_KEY:    'PON_AQUI_TU_API_KEY_DE_BLOOMERANG',        // API key de Bloomerang
+  BLOOMERANG_ENABLED:    false                                        // Cambia a true cuando tengas tu API key
 };
 
 var KOBO_API_URL = 'https://kf.kobotoolbox.org/api/v2/assets/' +
@@ -39,6 +41,9 @@ function checkNewSubmissions() {
     var id = String(submission['_id']);
     if (!processedIds[id]) {
       appendToSheet(sheet, submission);
+      if (CONFIG.BLOOMERANG_ENABLED) {
+        createBloomerangContact(submission);
+      }
       newCount++;
     }
   });
@@ -335,4 +340,77 @@ function testConnection() {
 function testWeeklySummary() {
   Logger.log('Ejecutando prueba del correo semanal...');
   sendWeeklySummary();
+}
+
+// ============================================================
+//  BLOOMERANG — Crear contacto cuando llega respuesta nueva
+// ============================================================
+function createBloomerangContact(submission) {
+  var fullName = (submission['visitor_info/visitor_name'] || '').trim();
+  var email    = (submission['visitor_info/visitor_email'] || '').trim();
+
+  if (!email) {
+    Logger.log('Bloomerang: sin correo, contacto no creado para: ' + fullName);
+    return;
+  }
+
+  // Separar nombre y apellido (primera palabra = nombre, resto = apellido)
+  var parts     = fullName.split(' ');
+  var firstName = parts[0] || '';
+  var lastName  = parts.slice(1).join(' ') || '';
+
+  var payload = {
+    Type:         'Individual',
+    FirstName:    firstName,
+    LastName:     lastName,
+    PrimaryEmail: {
+      Value:     email,
+      IsPrimary: true
+    },
+    Notes: 'Ingresado via formulario de visitas Creamos. Fecha: ' +
+           (submission['visitor_info/visit_date'] || '')
+  };
+
+  var options = {
+    method:      'POST',
+    contentType: 'application/json',
+    headers:     { 'X-API-KEY': CONFIG.BLOOMERANG_API_KEY },
+    payload:     JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    var response = UrlFetchApp.fetch('https://api.bloomerang.co/v2/constituent', options);
+    var code     = response.getResponseCode();
+
+    if (code === 200 || code === 201) {
+      var result = JSON.parse(response.getContentText());
+      Logger.log('✓ Bloomerang: contacto creado — ' + fullName + ' (ID: ' + result.Id + ')');
+    } else if (code === 409) {
+      Logger.log('Bloomerang: ' + email + ' ya existe como contacto. Sin duplicado.');
+    } else {
+      Logger.log('Bloomerang ERROR (' + code + '): ' + response.getContentText());
+    }
+  } catch (e) {
+    Logger.log('Bloomerang: error de conexión — ' + e.message);
+  }
+}
+
+// ============================================================
+//  PRUEBA DE BLOOMERANG (sin datos reales)
+// ============================================================
+function testBloomerang() {
+  if (!CONFIG.BLOOMERANG_ENABLED) {
+    Logger.log('AVISO: BLOOMERANG_ENABLED está en false. Cámbialo a true primero.');
+    return;
+  }
+
+  var fakeSubmission = {
+    'visitor_info/visitor_name':  'Prueba Creamos',
+    'visitor_info/visitor_email': CONFIG.NOTIFICATION_EMAIL,
+    'visitor_info/visit_date':    new Date().toISOString().slice(0, 10)
+  };
+
+  Logger.log('Creando contacto de prueba en Bloomerang...');
+  createBloomerangContact(fakeSubmission);
 }
