@@ -1,80 +1,115 @@
 # Formulario de Ingresos — Creamos Guatemala
 
-Script de Google Apps Script que conecta el formulario de KoboToolbox con Google Sheets y envía notificaciones por correo cuando alguien llena el formulario.
+Script de Google Apps Script que conecta el formulario de KoboToolbox con Google Sheets y envía un resumen semanal cada lunes con los nuevos ingresos.
 
 ---
 
-## Cómo configurarlo (paso a paso)
+## Cómo funciona
+
+```
+KoboToolbox (formulario)
+        ↓  (cada hora, silencioso)
+  Google Sheets  ←──── nuevas filas marcadas como "Nuevo"
+        ↓  (cada lunes 8 AM, solo si hay nuevos)
+  Correo resumen con tabla de ingresos de la semana
+        ↓
+  Filas marcadas como "Enviado" (para no repetir)
+```
+
+---
+
+## Configuración paso a paso
 
 ### 1. Crear el Google Sheet
 
-1. Ve a [sheets.google.com](https://sheets.google.com) y crea una nueva hoja
-2. Ponle un nombre descriptivo, por ejemplo: `Ingresos Creamos`
+1. Ve a [sheets.google.com](https://sheets.google.com) y crea una hoja nueva
+2. Nombre sugerido: `Ingresos Creamos`
 
 ### 2. Abrir el editor de Apps Script
 
-1. En Google Sheets, ve a **Extensiones → Apps Script**
-2. Borra el código que aparece por defecto
-3. Copia y pega todo el contenido del archivo `Code.gs` de este repositorio
+1. En Google Sheets → **Extensiones → Apps Script**
+2. Borra el código por defecto
+3. Pega todo el contenido del archivo `Code.gs`
 
 ### 3. Obtener tu Token de API de KoboToolbox
 
 1. Entra a [kf.kobotoolbox.org](https://kf.kobotoolbox.org)
-2. Haz clic en tu nombre de usuario (arriba a la derecha) → **Account Settings**
-3. En la sección **API**, copia tu token
+2. Clic en tu nombre → **Account Settings**
+3. Sección **API** → copia el token
 
-### 4. Editar los valores de configuración
+### 4. Editar la configuración
 
 Al inicio del script, edita estas 2 líneas:
 
 ```javascript
-KOBO_API_TOKEN:     'PON_AQUI_TU_TOKEN_DE_KOBO',
+KOBO_API_TOKEN:     'tu-token-aqui',
 NOTIFICATION_EMAIL: 'correo@creamos.org',
 ```
 
-El `KOBO_ASSET_UID` ya está configurado con el UID correcto del formulario.
+### 5. Probar la conexión
 
-### 5. Guardar y probar la conexión
+1. Selecciona la función `testConnection` → **Ejecutar**
+2. Acepta los permisos de Google (solo la primera vez)
+3. Verifica en el log: `Conexión exitosa. Total de respuestas: XX`
 
-1. Guarda el script con **Ctrl+S**
-2. En el menú de funciones (arriba), selecciona `testConnection`
-3. Haz clic en **Ejecutar**
-4. Acepta los permisos que Google solicita (es normal la primera vez)
-5. Revisa el **Log** (Ver → Registros) — debe decir "Conexión exitosa"
+### 6. Probar el correo semanal
 
-### 6. Activar el trigger automático
+1. Asegúrate de tener al menos una fila con estado **"Nuevo"** en el Sheet
+2. Selecciona `testWeeklySummary` → **Ejecutar**
+3. Revisa que llegue el correo con la tabla de ingresos
 
-1. Selecciona la función `setupTrigger`
-2. Haz clic en **Ejecutar**
-3. Listo — el script revisará KoboToolbox **cada hora** y enviará correos de las respuestas nuevas
+### 7. Activar los triggers automáticos
 
----
-
-## Qué hace el script
-
-| Función | Descripción |
-|---|---|
-| `checkNewSubmissions` | Función principal: revisa nuevas respuestas y envía correos |
-| `testConnection` | Prueba que la conexión con KoboToolbox funcione |
-| `setupTrigger` | Activa el trigger automático cada hora |
-
-## Datos que guarda en el Sheet
-
-| Columna | Campo KoboToolbox |
-|---|---|
-| ID | `_id` |
-| Nombre del Visitante | `visitor_info/visitor_name` |
-| Fecha de Visita | `visitor_info/visit_date` |
-| Fecha de Envío | `_submission_time` |
-| Boletín | `visitor_info/newsletter` |
-| Contacto de Emergencia | `emergency_contact/emergency_name` |
-| Teléfono de Emergencia | `emergency_contact/emergency_phone` |
-| Permiso de Fotos | `guidelines_section/photo_permission` |
-| Exención de Responsabilidad | `liability_section/liability_waiver` |
+1. Selecciona `setupTrigger` → **Ejecutar**
+2. El log confirmará:
+   - `checkNewSubmissions`: corre cada hora (sincroniza datos)
+   - `sendWeeklySummary`: corre cada lunes a las 8 AM (envía resumen)
 
 ---
 
-## Formulario KoboToolbox
+## Funciones disponibles
+
+| Función | Cuándo ejecutar |
+|---|---|
+| `testConnection` | Una vez para verificar que la API funciona |
+| `testWeeklySummary` | Para probar el correo sin esperar el lunes |
+| `setupTrigger` | Una sola vez para activar todo |
+| `checkNewSubmissions` | Automático cada hora (no ejecutar manualmente) |
+| `sendWeeklySummary` | Automático cada lunes 8 AM (no ejecutar manualmente) |
+
+---
+
+## Columnas del Google Sheet
+
+| Col | Campo | Fuente |
+|---|---|---|
+| A | ID | `_id` |
+| B | Nombre del Visitante | `visitor_info/visitor_name` |
+| C | **Correo del Visitante** | `visitor_info/visitor_email` ← campo nuevo en el formulario |
+| D | Fecha de Visita | `visitor_info/visit_date` |
+| E | Boletín (newsletter) | `visitor_info/newsletter` |
+| F | Fecha de Envío | `_submission_time` |
+| G | Contacto de Emergencia | `emergency_contact/emergency_name` |
+| H | Teléfono de Emergencia | `emergency_contact/emergency_phone` |
+| I | Permiso de Fotos | `guidelines_section/photo_permission` |
+| J | Exención de Responsabilidad | `liability_section/liability_waiver` |
+| K | **Estado** | `Nuevo` → `Enviado` (automático) |
+
+---
+
+## Agregar correo del visitante al formulario XLSForm
+
+En la hoja **survey** del XLSForm, agrega esta fila dentro del grupo `visitor_info`:
+
+| type | name | label::English (en) | label::Español (es) | required |
+|---|---|---|---|---|
+| `text` | `visitor_email` | `Email address` | `Correo electrónico` | `false` |
+
+El campo en KoboToolbox quedará como `visitor_info/visitor_email`, que es exactamente lo que lee el script.
+
+---
+
+## Datos técnicos
 
 - **Asset UID:** `aJHSDMnJqjhZ6YPUsiyEze`
 - **API URL:** `https://kf.kobotoolbox.org/api/v2/assets/aJHSDMnJqjhZ6YPUsiyEze/data/?format=json`
