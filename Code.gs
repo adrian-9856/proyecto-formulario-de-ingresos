@@ -2,8 +2,8 @@
 //  CONFIGURACIÓN  ←  EDITA ESTOS 3 VALORES ANTES DE USAR
 // ============================================================
 var CONFIG = {
-  KOBO_API_TOKEN:     'PON_AQUI_TU_TOKEN_DE_KOBO',   // Tu token de API de KoboToolbox
-  NOTIFICATION_EMAIL: 'PON_AQUI_EL_CORREO_DESTINO',  // Correo que recibirá las alertas
+  KOBO_API_TOKEN:     '64cc018b88067397addd36b09288be8b6539cf39',   // Tu token de API de KoboToolbox
+  NOTIFICATION_EMAIL: 'adrian@creamosguatemala.org',  // Correo que recibirá las alertas
   KOBO_ASSET_UID:     'aJHSDMnJqjhZ6YPUsiyEze'        // UID del formulario (ya configurado)
 };
 
