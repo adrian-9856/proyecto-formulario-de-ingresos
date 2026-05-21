@@ -106,55 +106,93 @@ function sendWeeklySummary() {
 }
 
 // ============================================================
+//  HELPERS DE FORMATO
+// ============================================================
+function fmtDate(val) {
+  if (!val) return '—';
+  if (val instanceof Date) {
+    return Utilities.formatDate(val, 'America/Guatemala', 'dd/MM/yyyy');
+  }
+  // Si viene como string "2026-05-20", convertir a dd/MM/yyyy
+  var m = String(val).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[3] + '/' + m[2] + '/' + m[1];
+  return String(val);
+}
+
+function fmtEmail(val) {
+  if (!val || val === 'email not found' || String(val).trim() === '') {
+    return '<span style="color:#bbb;font-style:italic;">Sin correo</span>';
+  }
+  return '<a href="mailto:' + val + '" style="color:#4a86e8;text-decoration:none;">' + val + '</a>';
+}
+
+function fmtNewsletter(val) {
+  return val === 'yes'
+    ? '<span style="color:#2e7d32;font-weight:bold;">&#10003; Sí</span>'
+    : '<span style="color:#999;">No</span>';
+}
+
+// ============================================================
 //  CONSTRUIR HTML DEL CORREO SEMANAL
 // ============================================================
 function buildWeeklySummaryHtml(rows, fecha) {
   var rowsHtml = rows.map(function(r, i) {
     var bg = i % 2 === 0 ? '#f8f9fa' : '#ffffff';
     return '<tr style="background:' + bg + ';">' +
-      '<td style="padding:10px 12px;border-bottom:1px solid #e0e0e0;">' + (i + 1) + '</td>' +
-      '<td style="padding:10px 12px;border-bottom:1px solid #e0e0e0;font-weight:bold;">' + (r[1] || '—') + '</td>' +
-      '<td style="padding:10px 12px;border-bottom:1px solid #e0e0e0;">' + (r[2] || '—') + '</td>' +
-      '<td style="padding:10px 12px;border-bottom:1px solid #e0e0e0;">' + (r[3] || '—') + '</td>' +
-      '<td style="padding:10px 12px;border-bottom:1px solid #e0e0e0;">' + (r[6] || '—') + '</td>' +
-      '<td style="padding:10px 12px;border-bottom:1px solid #e0e0e0;">' + (r[7] || '—') + '</td>' +
-      '<td style="padding:10px 12px;border-bottom:1px solid #e0e0e0;">' + (r[4] === 'yes' ? '✔ Sí' : 'No') + '</td>' +
+      '<td style="padding:10px 14px;border-bottom:1px solid #e8e8e8;color:#999;font-size:12px;">' + (i + 1) + '</td>' +
+      '<td style="padding:10px 14px;border-bottom:1px solid #e8e8e8;font-weight:600;color:#222;">' + (r[1] || '—') + '</td>' +
+      '<td style="padding:10px 14px;border-bottom:1px solid #e8e8e8;font-size:12px;">' + fmtEmail(r[2]) + '</td>' +
+      '<td style="padding:10px 14px;border-bottom:1px solid #e8e8e8;white-space:nowrap;">' + fmtDate(r[3]) + '</td>' +
+      '<td style="padding:10px 14px;border-bottom:1px solid #e8e8e8;">' + (r[6] || '—') + '</td>' +
+      '<td style="padding:10px 14px;border-bottom:1px solid #e8e8e8;white-space:nowrap;">' + (r[7] || '—') + '</td>' +
+      '<td style="padding:10px 14px;border-bottom:1px solid #e8e8e8;text-align:center;">' + fmtNewsletter(r[4]) + '</td>' +
       '</tr>';
   }).join('');
 
-  return '<div style="font-family:Arial,sans-serif;max-width:800px;margin:0 auto;">' +
+  var siBoletin = rows.filter(function(r) { return r[4] === 'yes'; }).length;
 
-    '<div style="background:#4a86e8;padding:24px 28px;border-radius:8px 8px 0 0;">' +
-    '<h2 style="color:#fff;margin:0;font-size:20px;">Resumen Semanal de Ingresos</h2>' +
-    '<p style="color:#c8d8f8;margin:6px 0 0;font-size:14px;">Creamos Guatemala — ' + fecha + '</p>' +
+  return '<div style="font-family:Arial,sans-serif;max-width:820px;margin:0 auto;background:#fff;">' +
+
+    // Encabezado
+    '<div style="background:linear-gradient(135deg,#4a86e8,#3367d6);padding:28px 32px;border-radius:10px 10px 0 0;">' +
+    '<h2 style="color:#fff;margin:0;font-size:22px;letter-spacing:-0.3px;">Resumen Semanal de Ingresos</h2>' +
+    '<p style="color:#c8d8f8;margin:6px 0 0;font-size:14px;">Creamos Guatemala &nbsp;·&nbsp; ' + fecha + '</p>' +
     '</div>' +
 
-    '<div style="background:#fff;padding:24px 28px;border:1px solid #e0e0e0;">' +
-    '<p style="font-size:15px;color:#333;">Esta semana se registraron <strong>' + rows.length +
-    ' ingreso(s) nuevo(s)</strong>:</p>' +
+    // Contadores
+    '<div style="display:flex;gap:0;border:1px solid #e0e0e0;border-top:none;">' +
+    '<div style="flex:1;padding:18px 24px;border-right:1px solid #e0e0e0;text-align:center;">' +
+    '<div style="font-size:32px;font-weight:700;color:#4a86e8;">' + rows.length + '</div>' +
+    '<div style="font-size:12px;color:#888;margin-top:2px;">Ingresos nuevos</div>' +
+    '</div>' +
+    '<div style="flex:1;padding:18px 24px;text-align:center;">' +
+    '<div style="font-size:32px;font-weight:700;color:#2e7d32;">' + siBoletin + '</div>' +
+    '<div style="font-size:12px;color:#888;margin-top:2px;">Suscritos al boletín</div>' +
+    '</div>' +
+    '</div>' +
 
-    '<div style="overflow-x:auto;">' +
+    // Tabla
+    '<div style="border:1px solid #e0e0e0;border-top:none;overflow-x:auto;">' +
     '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
     '<thead>' +
-    '<tr style="background:#4a86e8;color:#fff;">' +
-    '<th style="padding:10px 12px;text-align:left;">#</th>' +
-    '<th style="padding:10px 12px;text-align:left;">Nombre</th>' +
-    '<th style="padding:10px 12px;text-align:left;">Correo</th>' +
-    '<th style="padding:10px 12px;text-align:left;">Fecha Visita</th>' +
-    '<th style="padding:10px 12px;text-align:left;">Contacto Emergencia</th>' +
-    '<th style="padding:10px 12px;text-align:left;">Tel. Emergencia</th>' +
-    '<th style="padding:10px 12px;text-align:left;">Boletín</th>' +
+    '<tr style="background:#f5f7ff;">' +
+    '<th style="padding:10px 14px;text-align:left;color:#666;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #e0e0e0;">#</th>' +
+    '<th style="padding:10px 14px;text-align:left;color:#666;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #e0e0e0;">Nombre</th>' +
+    '<th style="padding:10px 14px;text-align:left;color:#666;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #e0e0e0;">Correo</th>' +
+    '<th style="padding:10px 14px;text-align:left;color:#666;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #e0e0e0;">Fecha Visita</th>' +
+    '<th style="padding:10px 14px;text-align:left;color:#666;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #e0e0e0;">Contacto Emergencia</th>' +
+    '<th style="padding:10px 14px;text-align:left;color:#666;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #e0e0e0;">Teléfono</th>' +
+    '<th style="padding:10px 14px;text-align:center;color:#666;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #e0e0e0;">Boletín</th>' +
     '</tr>' +
     '</thead>' +
     '<tbody>' + rowsHtml + '</tbody>' +
     '</table>' +
     '</div>' +
 
-    '</div>' +
-
-    '<div style="background:#f0f4ff;padding:12px 28px;border-radius:0 0 8px 8px;border:1px solid #e0e0e0;border-top:none;">' +
-    '<p style="font-size:12px;color:#888;margin:0;">' +
-    'Este correo se genera automáticamente cada lunes. Ver detalle completo en Google Sheets.' +
+    // Pie
+    '<div style="padding:14px 24px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;background:#fafafa;">' +
+    '<p style="font-size:11px;color:#aaa;margin:0;">' +
+    'Generado automáticamente cada lunes &nbsp;·&nbsp; Ver detalle completo en Google Sheets' +
     '</p>' +
     '</div>' +
 
@@ -174,12 +212,13 @@ function buildWeeklySummaryPlain(rows, fecha) {
   ];
 
   rows.forEach(function(r, i) {
+    var email = (!r[2] || r[2] === 'email not found') ? 'Sin correo' : r[2];
     lines.push('');
     lines.push((i + 1) + '. ' + (r[1] || 'Sin nombre'));
-    lines.push('   Correo:      '  + (r[2] || '—'));
-    lines.push('   Visita:      '  + (r[3] || '—'));
-    lines.push('   Emergencia:  '  + (r[6] || '—') + '  ' + (r[7] || ''));
-    lines.push('   Boletín:     '  + (r[4] === 'yes' ? 'Sí' : 'No'));
+    lines.push('   Correo:      ' + email);
+    lines.push('   Visita:      ' + fmtDate(r[3]));
+    lines.push('   Emergencia:  ' + (r[6] || '—') + '  ' + (r[7] || ''));
+    lines.push('   Boletín:     ' + (r[4] === 'yes' ? 'Sí' : 'No'));
   });
 
   lines.push('');
