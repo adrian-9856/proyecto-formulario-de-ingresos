@@ -24,6 +24,9 @@ function onOpen() {
     .createMenu('Creamos')
     .addItem('Configurar credenciales', 'showSetupDialog')
     .addSeparator()
+    .addItem('Sincronizar datos ahora', 'syncNow')
+    .addItem('Enviar reporte manual de nuevos ingresos', 'sendManualReport')
+    .addSeparator()
     .addItem('Activar triggers automaticos', 'setupTrigger')
     .addSeparator()
     .addItem('Probar conexion con Kobo', 'testConnection')
@@ -483,6 +486,93 @@ function createBloomerangContact(submission, config) {
   } catch (e) {
     Logger.log('Bloomerang: error — ' + e.message);
   }
+}
+
+// ============================================================
+//  SINCRONIZAR AHORA (manual, con feedback visible)
+// ============================================================
+function syncNow() {
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_NAME);
+  var antes = sheet ? Math.max(sheet.getLastRow() - 1, 0) : 0;
+
+  checkNewSubmissions();
+
+  sheet = ss.getSheetByName(SHEET_NAME);
+  var despues  = sheet ? Math.max(sheet.getLastRow() - 1, 0) : 0;
+  var agregados = despues - antes;
+
+  SpreadsheetApp.getUi().alert(
+    'Sincronizacion completada',
+    agregados > 0
+      ? agregados + ' nuevo(s) ingreso(s) agregado(s) al Sheet.'
+      : 'No se encontraron ingresos nuevos. El Sheet ya esta al dia.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+// ============================================================
+//  REPORTE MANUAL — envia el correo cuando tu quieras
+// ============================================================
+function sendManualReport() {
+  var config = getConfig();
+  var ss     = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet  = ss.getSheetByName(SHEET_NAME);
+  var ui     = SpreadsheetApp.getUi();
+
+  if (!sheet || sheet.getLastRow() < 2) {
+    ui.alert('Sin datos', 'No hay ingresos registrados todavia.', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Primero sincroniza por si hay formularios nuevos no capturados
+  checkNewSubmissions();
+
+  var lastRow = sheet.getLastRow();
+  var allData = sheet.getRange(2, 1, lastRow - 1, STATUS_COL).getValues();
+  var newRows = [];
+  var rowNums = [];
+
+  allData.forEach(function(row, i) {
+    if (row[STATUS_COL - 1] === 'Nuevo') {
+      newRows.push(row);
+      rowNums.push(i + 2);
+    }
+  });
+
+  if (newRows.length === 0) {
+    ui.alert(
+      'Sin ingresos nuevos',
+      'No hay ingresos con estado "Nuevo".\n\n' +
+      'Si necesitas reenviar registros anteriores:\n' +
+      '1. En el Sheet, cambia manualmente el estado de esas filas a "Nuevo"\n' +
+      '2. Vuelve a ejecutar "Enviar reporte manual"',
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
+  var today  = new Date();
+  var opts   = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  var fecha  = today.toLocaleDateString('es-GT', opts);
+  var subject = 'Reporte de ingresos a Creamos — ' + fecha;
+
+  GmailApp.sendEmail(
+    config.NOTIFICATION_EMAIL,
+    subject,
+    buildWeeklySummaryPlain(newRows, fecha),
+    { htmlBody: buildWeeklySummaryHtml(newRows, fecha) }
+  );
+
+  rowNums.forEach(function(rowNum) {
+    sheet.getRange(rowNum, STATUS_COL).setValue('Enviado');
+  });
+
+  ui.alert(
+    'Reporte enviado',
+    'Se envio el reporte con ' + newRows.length + ' ingreso(s) a:\n' + config.NOTIFICATION_EMAIL,
+    ui.ButtonSet.OK
+  );
 }
 
 // ============================================================
